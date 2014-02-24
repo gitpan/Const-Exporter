@@ -1,16 +1,15 @@
 package Const::Exporter;
 
-use v5.10.1;
+use v5.10.0;
 
 use strict;
 use warnings;
 
-use version 0.77; our $VERSION = version->declare('v0.1.1');
+use version 0.77; our $VERSION = version->declare('v0.1.2');
 
 use Carp;
 use Const::Fast;
 use Exporter ();
-use List::MoreUtils qw/ uniq /;
 use Package::Stash;
 use Scalar::Util qw/ reftype /;
 
@@ -23,37 +22,18 @@ sub import {
     # Create @EXPORT, @EXPORT_OK, %EXPORT_TAGS and import if they
     # don't yet exist.
 
-    my $export = $stash->get_symbol('@EXPORT');
-    unless ($export) {
-        $stash->add_symbol('@EXPORT', [ ]);
-        $export = $stash->get_symbol('@EXPORT');
-    }
+    my $export = $stash->get_or_add_symbol('@EXPORT');
 
-    my $export_ok = $stash->get_symbol('@EXPORT_OK');
-    unless ($export_ok) {
-        $stash->add_symbol('@EXPORT_OK', [ ]);
-        $export_ok = $stash->get_symbol('@EXPORT_OK');
-    }
+    my $export_ok = $stash->get_or_add_symbol('@EXPORT_OK');
 
-    my $export_tags = $stash->get_symbol('%EXPORT_TAGS');
-    unless ($export_tags) {
-        $stash->add_symbol('%EXPORT_TAGS', { });
-        $export_tags = $stash->get_symbol('%EXPORT_TAGS');
-    }
+    my $export_tags = $stash->get_or_add_symbol('%EXPORT_TAGS');
 
     $stash->add_symbol('&import', \&Exporter::import)
         unless ($stash->has_symbol('&import'));
 
-    my $add_symbol_to_exports = sub {
-        my ($symbol, $tag) = @_;
-
-        $export_tags->{$tag} //= [ ];
-
-        push @{ $export_tags->{$tag} }, $symbol;
-        push @{ $export_ok }, $symbol;
-    };
-
     while ( my $tag = shift ) {
+
+        croak "'${tag}' is reserved" if $tag eq 'all';
 
         my $defs = shift;
 
@@ -83,8 +63,7 @@ sub import {
                         $value = @values ? (shift @values) : ++$value;
 
                         _add_symbol($stash, $symbol, $value);
-
-                        $add_symbol_to_exports->($symbol, $tag);
+                        _export_symbol($stash, $symbol, $tag);
 
                     }
 
@@ -107,33 +86,21 @@ sub import {
 
                         my $ref = $stash->get_symbol($norm);
 
-                        if (_get_reftype($sigil) eq reftype($ref)) {
+                        # In case symbol is defined as `our`
+                        # beforehand, ensure it is readonly.
 
-                            # In case symbol is defined as `our`
-                            # beforehand, ensure it is readonly.
+                        Const::Fast::_make_readonly( $ref => 1 );
 
-                            Const::Fast::_make_readonly( $ref => 1 );
+                        _export_symbol($stash, $symbol, $tag);
 
-                            $add_symbol_to_exports->($symbol, $tag);
-
-                            next;
-
-                        } else {
-
-                            # We defining a symbol with a different
-                            # sigil, e.g. '$foo' and '@foo';
-
-                            # TODO: warn about multiple symbols
-
-                        }
+                        next;
 
                     }
 
                     my $value = shift @{$defs};
 
                     _add_symbol($stash, $symbol, $value);
-
-                    $add_symbol_to_exports->($symbol, $tag);
+                    _export_symbol($stash, $symbol, $tag);
 
                     next;
                 }
@@ -151,35 +118,18 @@ sub import {
     # symbols. This may not matter to Exporter, but we want to ensure
     # the values are 'clean'. It also simplifies testing.
 
-    {
-        my @list;
-        while (my $symbol = shift @{$export}) {
-            push @list, $symbol;
-        }
-        push @list, @{$export_tags->{default}} if $export_tags->{default};
-        push @{$export}, uniq @list;
-    }
+    push @{$export}, @{$export_tags->{default}} if $export_tags->{default};
+    _uniq( $export );
 
-    {
-        my @list;
-        while (my $symbol = shift @{$export_ok}) {
-            push @list, $symbol;
-        }
-        push @{$export_ok}, uniq @list;
-    }
+    _uniq( $export_ok );
 
-    {
-        $export_tags->{all} //= [ ];
+    $export_tags->{all} //= [ ];
+    push @{ $export_tags->{all} }, @{$export_ok};
 
-        my @list = @{$export_ok};
-        while (my $symbol = shift @{$export_tags->{all}}) {
-            push @list, $symbol;
-        }
-        push @{$export_tags->{all}}, uniq @list;
-    }
-
-
+    _uniq($export_tags->{$_}) for keys %{$export_tags};
 }
+
+# Add a symbol to the stash
 
 sub _add_symbol {
     my ($stash, $symbol, $value) = @_;
@@ -197,11 +147,30 @@ sub _add_symbol {
     }
 }
 
+# Add a symbol to @EXPORT_OK and %EXPORT_TAGS
+
+sub _export_symbol {
+    my ($stash, $symbol, $tag) = @_;
+
+    my $export_ok = $stash->get_symbol('@EXPORT_OK');
+    my $export_tags = $stash->get_symbol('%EXPORT_TAGS');
+
+    $export_tags->{$tag} //= [ ];
+
+    push @{ $export_tags->{$tag} }, $symbol;
+    push @{ $export_ok }, $symbol;
+}
+
+# Function to get the sigil from a symbol. If no sigil, it assumes
+# that it is a function reference.
+
 sub _get_sigil {
     my ($symbol) = @_;
     $symbol =~ /^(\W)/;
     return $1 // '&';
 }
+
+# Function to convert a sigil into the corresponding reftype.
 
 {
     const my %_reftype => (
@@ -217,11 +186,23 @@ sub _get_sigil {
     }
 }
 
+# Function to take a list reference and prune duplicate elements from
+# it.
+
+sub _uniq {
+    my ($listref) = @_;
+    my %seen;
+    while (my $item = shift @{$listref}) {
+        $seen{$item} = 1;
+    }
+    push @{$listref}, keys %seen;
+}
+
 1;
 
 =head1 NAME
 
-Const::Exporter - export constants
+Const::Exporter - Declare constants for export.
 
 =head1 SYNOPSIS
 
@@ -231,7 +212,7 @@ Define a constants module:
 
   use Const::Fast;
 
-  const our $zoo => 1234;
+  our $zoo => 1234;
 
   use Const::Exporter
 
@@ -300,7 +281,8 @@ Constants in the "default" tag are exported by default (that is, they are added
 to the C<@EXPORTS> array).
 
 When a constant is already defined in a previous tag, then no value is
-specified for it. (For example, "bar" in "tab_b" above.)
+specified for it. (For example, "bar" in "tab_b" above.)  If you do
+give a value, L<Const::Exporter> will assume it's another symbol.
 
 Your module can include multiple calls to C<use Const::Exporter>, so
 that you can reference constants in other expressions, e.g.
@@ -316,6 +298,22 @@ that you can reference constants in other expressions, e.g.
     tag => [
         '$one' => 1 + $zero,
     ];
+
+or even something more complex:
+
+  use Const::Exporter
+
+     http_ports => [
+        'HTTP'     => 80,
+        'HTTP_ALT' => 8080,
+        'HTTPS'    => 443,
+     ];
+
+  use Const::Exporter
+
+     http_ports => [
+        '@HTTP_PORTS' => [ HTTP, HTTP_ALT, HTTPS ],
+     ];
 
 Constants can include traditional L<constant> symbols, as well as
 scalars, arrays or hashes.
@@ -335,6 +333,104 @@ Constants can include values defined elsewhere in the code, e.g.
 Note that this will make the symbol read-only. You don't need to
 explicitly declare it as such.
 
+Enumerated constants are also supported:
+
+  use Const::Exporer
+
+    tag => [
+
+      [qw/ foo bar baz /] => 1,
+
+    ];
+
+will define the symbols "foo" (1), "bar" (2) and "baz" (3).
+
+You can also specify a list of numbers, if you want to skip values:
+
+  use Const::Exporer
+
+    tag => [
+
+      [qw/ foo bar baz /] => [1, 4],
+
+    ];
+
+will define the symbols "foo" (1), "bar" (4) and "baz" (5).
+
+You can even specify string values:
+
+  use Const::Exporer
+
+    tag => [
+
+      [qw/ foo bar baz /] => [qw/ feh meh neh /],
+
+    ];
+
+however, this is equivalent to
+
+  use Const::Exporer
+
+    tag => [
+      'foo' => 'feh',
+      'bar' => 'meh',
+      'baz' => 'neh',
+    ];
+
+=head2 Mixing POD with Tags
+
+The following code is a syntax error, at least with some versions of
+Perl:
+
+  use Const::Exporter
+
+  =head2 a
+
+  =cut
+
+    a => [ foo => 1 ],
+
+  =head2 b
+
+  =cut
+
+    b => [ bar => 2 ];
+
+If you want to mix POD with your declarations, use multiple use lines,
+e.g.
+
+  =head2 a
+
+  =cut
+
+  use Const::Exporter
+    a => [ foo => 1 ];
+
+  =head2 b
+
+  =cut
+
+  use Const::Exporter
+    b => [ bar => 2 ];
+
+=head2 Export Tags
+
+By default, all symbols are exportable (in C<@EXPORT_OK>.)
+
+The C<:default> tag is the same as not specifying any exports.
+
+The C<:all> tag exports all symbols.
+
+=head2 Using as part of a module with exported functions
+
+L<Const::Exporter> is not intended for use with modules that also
+export functions.
+
+There are workarounds that you can use, such as getting
+L<Const::Exporter> to export your functions, or munging C<@EXPORT> et
+al separately, but these are not supported and changes in the future
+my break our code.
+
 =head1 SEE ALSO
 
 See L<Exporter> for a discussion of export tags.
@@ -345,25 +441,19 @@ See L<Exporter> for a discussion of export tags.
 
 =item L<Exporter::Constants>
 
+This module only allows you to declare function symbol constants, akin
+to the L<constant> module, without tags.
+
 =item L<Constant::Exporter>
 
-=item L<Constant::Exporter::Lazy>
+This module only allows you to declare function symbol constants, akin
+to the L<constant> module, although you can specify tags.
 
-=back
+=item L<Constant::Export::Lazy>
 
-=head2 Modules for Declaring Readonly values
-
-=over
-
-=item L<constant>
-
-=item L<enum>
-
-=item L<Const::Fast>
-
-=item L<Readonly>
-
-=item L<Readonly::Enum>
+This module only allows you to declare function symbol constants, akin
+to the L<constant> module by defining functions that are only called
+as needed.  The interface is rather complex.
 
 =back
 

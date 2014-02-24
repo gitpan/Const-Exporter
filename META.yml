@@ -1,5 +1,5 @@
 ---
-abstract: 'export constants'
+abstract: 'Declare constants for export.'
 author:
   - 'Robert Rothenberg, C<< <rrwo at cpan.org> >>'
   - 'Robert Rothenberg <rrwo@cpan.org>'
@@ -29,7 +29,6 @@ requires:
   Carp: 0
   Const::Fast: 0.014
   Exporter: 0
-  List::MoreUtils: 0.09
   Package::Stash: 0
   Scalar::Util: 0
   perl: 5.01
@@ -39,4 +38,4 @@ resources:
   homepage: http://rrwo.tumblr.com
   license: http://www.perlfoundation.org/artistic_license_2_0
   repository: git://github.com/robrwo/Const-Exporter.git
-version: 0.001001
+version: 0.001002

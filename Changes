@@ -1,6 +1,14 @@
 Revision history for Const::Exporer
 
-v0.1.1   2014-02-24
+v0.1.2   2014-02-24
+
+         - Import dies if given the tag "all", since it's reserved.
+
+         - Various documentation improvements.
+
+         - Code cleanup.
+
+v0.1.1   2014-02-23
 
          - Added missing Changes and MANIFEST.SKIP files.
 

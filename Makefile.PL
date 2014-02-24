@@ -31,11 +31,10 @@ requires (
     'Carp'               => 0,
     'Const::Fast'        => 0.014,
     'Exporter'           => 0,
-    'List::MoreUtils'    => 0.09,
     'Package::Stash'     => 0,
     'Scalar::Util'       => 0,
     'version'            => 0.77,
-    );
+);
 
 recommends (
     'Package::Stash::XS' => 0,
