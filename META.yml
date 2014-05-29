@@ -5,11 +5,11 @@ author:
   - 'Robert Rothenberg <rrwo@cpan.org>'
 build_requires:
   ExtUtils::MakeMaker: 6.59
+  Hash::Objectify: 0
   Test::Most: 0
   Test::Warnings: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.59
-  Module::Install: 0
 distribution_type: module
 dynamic_config: 1
 generated_by: 'Module::Install version 1.06'
@@ -22,6 +22,7 @@ no_index:
   directory:
     - inc
     - t
+    - xt
 recommends:
   Package::Stash::XS: 0
   Storable: 0
@@ -38,4 +39,4 @@ resources:
   homepage: http://rrwo.tumblr.com
   license: http://www.perlfoundation.org/artistic_license_2_0
   repository: git://github.com/robrwo/Const-Exporter.git
-version: 0.001002
+version: 0.002000

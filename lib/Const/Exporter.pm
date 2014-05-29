@@ -5,19 +5,19 @@ use v5.10.0;
 use strict;
 use warnings;
 
-use version 0.77; our $VERSION = version->declare('v0.1.2');
+use version 0.77; our $VERSION = version->declare('v0.2.0');
 
 use Carp;
 use Const::Fast;
 use Exporter ();
 use Package::Stash;
-use Scalar::Util qw/ reftype /;
+use Scalar::Util qw/ blessed reftype /;
 
 sub import {
-    my $pkg  = shift;
+    my $pkg = shift;
 
     my ($caller) = caller;
-    my $stash    = Package::Stash->new($caller);
+    my $stash = Package::Stash->new($caller);
 
     # Create @EXPORT, @EXPORT_OK, %EXPORT_TAGS and import if they
     # don't yet exist.
@@ -28,8 +28,8 @@ sub import {
 
     my $export_tags = $stash->get_or_add_symbol('%EXPORT_TAGS');
 
-    $stash->add_symbol('&import', \&Exporter::import)
-        unless ($stash->has_symbol('&import'));
+    $stash->add_symbol( '&import', \&Exporter::import )
+        unless ( $stash->has_symbol('&import') );
 
     while ( my $tag = shift ) {
 
@@ -38,32 +38,32 @@ sub import {
         my $defs = shift;
 
         croak "An array reference required for tag '${tag}'"
-            unless (ref $defs ) eq 'ARRAY';
+            unless ( ref $defs ) eq 'ARRAY';
 
-        while (my $item = shift @{$defs} ) {
+        while ( my $item = shift @{$defs} ) {
 
-            for( ref $item ) {
+            for ( ref $item ) {
 
                 # Array reference means a list of enumerated symbols
 
                 if (/^ARRAY$/) {
 
-                    my @enums  = @{$item};
-                    my $start  = shift @{$defs};
+                    my @enums = @{$item};
+                    my $start = shift @{$defs};
 
-                    my @values = (ref $start) ? @{ $start } : ( $start );
+                    my @values = ( ref $start ) ? @{$start} : ($start);
 
                     my $value = 0;
 
-                    while (my $symbol = shift @enums) {
+                    while ( my $symbol = shift @enums ) {
 
                         croak "${symbol} already exists"
-                            if ($stash->has_symbol($symbol));
+                            if ( $stash->has_symbol($symbol) );
 
-                        $value = @values ? (shift @values) : ++$value;
+                        $value = @values ? ( shift @values ) : ++$value;
 
-                        _add_symbol($stash, $symbol, $value);
-                        _export_symbol($stash, $symbol, $tag);
+                        _add_symbol( $stash, $symbol, $value );
+                        _export_symbol( $stash, $symbol, $tag );
 
                     }
 
@@ -76,13 +76,14 @@ sub import {
 
                     my $symbol = $item;
                     my $sigil  = _get_sigil($symbol);
-                    my $norm   = ($sigil eq '&') ? ($sigil . $symbol) : $symbol;
+                    my $norm
+                        = ( $sigil eq '&' ) ? ( $sigil . $symbol ) : $symbol;
 
                     # If the symbol is already defined, that we add it
                     # to the exports for that tag and assume no value
                     # is given for it.
 
-                    if ($stash->has_symbol($norm)) {
+                    if ( $stash->has_symbol($norm) ) {
 
                         my $ref = $stash->get_symbol($norm);
 
@@ -91,7 +92,7 @@ sub import {
 
                         Const::Fast::_make_readonly( $ref => 1 );
 
-                        _export_symbol($stash, $symbol, $tag);
+                        _export_symbol( $stash, $symbol, $tag );
 
                         next;
 
@@ -99,8 +100,8 @@ sub import {
 
                     my $value = shift @{$defs};
 
-                    _add_symbol($stash, $symbol, $value);
-                    _export_symbol($stash, $symbol, $tag);
+                    _add_symbol( $stash, $symbol, $value );
+                    _export_symbol( $stash, $symbol, $tag );
 
                     next;
                 }
@@ -108,7 +109,6 @@ sub import {
                 croak "$_ is not supported";
 
             }
-
 
         }
 
@@ -118,31 +118,38 @@ sub import {
     # symbols. This may not matter to Exporter, but we want to ensure
     # the values are 'clean'. It also simplifies testing.
 
-    push @{$export}, @{$export_tags->{default}} if $export_tags->{default};
-    _uniq( $export );
+    push @{$export}, @{ $export_tags->{default} } if $export_tags->{default};
+    _uniq($export);
 
-    _uniq( $export_ok );
+    _uniq($export_ok);
 
-    $export_tags->{all} //= [ ];
+    $export_tags->{all} //= [];
     push @{ $export_tags->{all} }, @{$export_ok};
 
-    _uniq($export_tags->{$_}) for keys %{$export_tags};
+    _uniq( $export_tags->{$_} ) for keys %{$export_tags};
 }
 
 # Add a symbol to the stash
 
 sub _add_symbol {
-    my ($stash, $symbol, $value) = @_;
+    my ( $stash, $symbol, $value ) = @_;
 
     my $sigil = _get_sigil($symbol);
-    if ($sigil ne '&') {
+    if ( $sigil ne '&' ) {
 
-        $stash->add_symbol($symbol, $value);
-        Const::Fast::_make_readonly( $stash->get_symbol($symbol) => 1 );
+        if ( blessed $value) {
+
+            $stash->add_symbol( $symbol, \$value );
+            Const::Fast::_make_readonly( $stash->get_symbol($symbol) => 1 );
+
+        } else {
+            $stash->add_symbol( $symbol, $value );
+            Const::Fast::_make_readonly( $stash->get_symbol($symbol) => 1 );
+        }
 
     } else {
 
-         $stash->add_symbol( '&' . $symbol, sub { $value });
+        $stash->add_symbol( '&' . $symbol, sub {$value} );
 
     }
 }
@@ -150,15 +157,15 @@ sub _add_symbol {
 # Add a symbol to @EXPORT_OK and %EXPORT_TAGS
 
 sub _export_symbol {
-    my ($stash, $symbol, $tag) = @_;
+    my ( $stash, $symbol, $tag ) = @_;
 
-    my $export_ok = $stash->get_symbol('@EXPORT_OK');
+    my $export_ok   = $stash->get_symbol('@EXPORT_OK');
     my $export_tags = $stash->get_symbol('%EXPORT_TAGS');
 
-    $export_tags->{$tag} //= [ ];
+    $export_tags->{$tag} //= [];
 
     push @{ $export_tags->{$tag} }, $symbol;
-    push @{ $export_ok }, $symbol;
+    push @{$export_ok}, $symbol;
 }
 
 # Function to get the sigil from a symbol. If no sigil, it assumes
@@ -192,7 +199,7 @@ sub _get_sigil {
 sub _uniq {
     my ($listref) = @_;
     my %seen;
-    while (my $item = shift @{$listref}) {
+    while ( my $item = shift @{$listref} ) {
         $seen{$item} = 1;
     }
     push @{$listref}, keys %seen;
@@ -257,11 +264,13 @@ and use that module:
 This module allows you to declare constants that can be exported to
 other modules.
 
+=for readme stop
+
 To declare constants, simply group then into export tags:
 
   package MyApp::Constants;
 
-  use Const::Exporer
+  use Const::Exporter
 
     tag_a => [
        'foo' => 1,
@@ -326,7 +335,7 @@ Constants can include values defined elsewhere in the code, e.g.
      $foo = calculate_value_for_constant();
   }
 
-  use Const::Exporer
+  use Const::Exporter
 
     tag => [ '$foo' ];
 
@@ -335,7 +344,7 @@ explicitly declare it as such.
 
 Enumerated constants are also supported:
 
-  use Const::Exporer
+  use Const::Exporter
 
     tag => [
 
@@ -343,11 +352,11 @@ Enumerated constants are also supported:
 
     ];
 
-will define the symbols "foo" (1), "bar" (2) and "baz" (3).
+will define the symbols C<foo> (1), C<bar> (2) and C<baz> (3).
 
 You can also specify a list of numbers, if you want to skip values:
 
-  use Const::Exporer
+  use Const::Exporter
 
     tag => [
 
@@ -355,11 +364,11 @@ You can also specify a list of numbers, if you want to skip values:
 
     ];
 
-will define the symbols "foo" (1), "bar" (4) and "baz" (5).
+will define the symbols C<foo> (1), C<bar> (4) and C<baz> (5).
 
 You can even specify string values:
 
-  use Const::Exporer
+  use Const::Exporter
 
     tag => [
 
@@ -369,12 +378,20 @@ You can even specify string values:
 
 however, this is equivalent to
 
-  use Const::Exporer
+  use Const::Exporter
 
     tag => [
       'foo' => 'feh',
       'bar' => 'meh',
       'baz' => 'neh',
+    ];
+
+Objects are also supported,
+
+   use Const::Exporter
+
+    tag => [
+      '$foo' => Something->new( 123 ),
     ];
 
 =head2 Mixing POD with Tags
@@ -427,9 +444,11 @@ L<Const::Exporter> is not intended for use with modules that also
 export functions.
 
 There are workarounds that you can use, such as getting
-L<Const::Exporter> to export your functions, or munging C<@EXPORT> et
-al separately, but these are not supported and changes in the future
-my break our code.
+L<Const::Exporter> to export your functions, or munging C<@EXPORT>
+etc. separately, but these are not supported and changes in the
+future my break our code.
+
+=for readme continue
 
 =head1 SEE ALSO
 
@@ -471,6 +490,8 @@ copy of the full license at:
 
 L<http://www.perlfoundation.org/artistic_license_2_0>
 
+=for readme stop
+
 Any use, modification, and distribution of the Standard or Modified
 Versions is governed by this Artistic License. By using, modifying or
 distributing the Package, you accept this license. Do not use, modify,
@@ -500,6 +521,8 @@ YOUR LOCAL LAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
 CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
 CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+=for readme continue
 
 =cut
 
