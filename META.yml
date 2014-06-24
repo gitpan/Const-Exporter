@@ -6,7 +6,6 @@ build_requires:
   ExtUtils::MakeMaker: 6.59
   Hash::Objectify: 0
   Test::Most: 0
-  Test::Warnings: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.59
 distribution_type: module
@@ -38,4 +37,4 @@ resources:
   homepage: http://rrwo.tumblr.com
   license: http://www.perlfoundation.org/artistic_license_2_0
   repository: git://github.com/robrwo/Const-Exporter.git
-version: 0.002001
+version: 0.002002

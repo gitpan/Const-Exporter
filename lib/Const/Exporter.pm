@@ -5,7 +5,7 @@ use v5.10.0;
 use strict;
 use warnings;
 
-use version 0.77; our $VERSION = version->declare('v0.2.1');
+use version 0.77; our $VERSION = version->declare('v0.2.2');
 
 use Carp;
 use Const::Fast;
@@ -222,7 +222,11 @@ modules:
 
 =item L<Const::Fast>
 
+=item L<Hash::Objectify> (for testing)
+
 =item L<Package::Stash>
+
+=item L<Test::Most> (for testing)
 
 =back
 
